@@ -1,0 +1,164 @@
+import { shallowMount } from '@vue/test-utils'
+import RegistrationForm from '@/components/RegistrationForm.vue'
+
+describe('RegistrationForm.vue', () => {
+  
+  it('validates nickname correctly', () => {
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData: []
+      }
+    });
+
+    wrapper.setData({
+      formData: {
+        nickname: '',
+        fullname: 'John Doe',
+        phone: '1234567890',
+        email: 'john.doe@example.com',
+        birthdate: '01-01-2000',
+        birthorder: '1',
+        coffee: '',
+        lovelanguage: ['Words of Affirmation', 'Acts of Service', 'Receiving Gifts'],
+        motto: 'Live and let live'
+      }
+    });
+
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    wrapper.vm.checkError();
+    expect(alertSpy).toHaveBeenCalledWith('Nickname should not be empty and exceed 20 characters.');
+    alertSpy.mockRestore();
+  });
+
+  it('validates email format correctly', () => {
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData: []
+      }
+    });
+
+    wrapper.setData({
+      formData: {
+        nickname: 'John',
+        fullname: 'John Doe',
+        phone: '1234567890',
+        email: 'invalid-email',
+        birthdate: '01-01-2000',
+        birthorder: '1',
+        coffee: '',
+        lovelanguage: ['Words of Affirmation', 'Acts of Service', 'Receiving Gifts'],
+        motto: 'Live and let live'
+      }
+    });
+
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    wrapper.vm.checkError();
+    expect(alertSpy).toHaveBeenCalledWith('Invalid format');
+    alertSpy.mockRestore();
+  });
+
+  it('submits successfully when all fields are valid', () => {
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData: []
+      }
+    });
+
+    wrapper.setData({
+      formData: {
+        nickname: 'John',
+        fullname: 'John Doe',
+        phone: '1234567890',
+        email: 'john.doe@example.com',
+        birthdate: '01-01-2000',
+        birthorder: '1',
+        coffee: '',
+        lovelanguage: ['Words of Affirmation', 'Acts of Service', 'Receiving Gifts'],
+        motto: 'Live and let live'
+      }
+    });
+
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    wrapper.vm.checkError();
+    expect(alertSpy).toHaveBeenCalledWith('Submission Successful');
+    alertSpy.mockRestore();
+  });
+
+  it('adds form data correctly', () => {
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData: []
+      }
+    });
+
+    const data = { key: 'nickname', value: 'John' };
+    wrapper.vm.addFormData(data);
+    expect(wrapper.vm.formData.nickname).toBe('John');
+  });
+
+  it('resets the form correctly', () => {
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData: []
+      }
+    });
+
+    wrapper.setData({
+      formData: {
+        nickname: 'John',
+        fullname: 'John Doe',
+        phone: '1234567890',
+        email: 'john.doe@example.com',
+        birthdate: '01-01-2000',
+        birthorder: '1',
+        coffee: '',
+        lovelanguage: ['Words of Affirmation', 'Acts of Service', 'Receiving Gifts'],
+        motto: 'Live and let live'
+      }
+    });
+
+    wrapper.vm.resetForm();
+
+    expect(wrapper.vm.formData).toEqual({
+      nickname: '',
+      fullname: '',
+      phone: '',
+      email: '',
+      birthdate: '',
+      birthorder: '',
+      coffee: '',
+      lovelanguage: [],
+      motto: ''
+    });
+  });
+
+  it('submits form data correctly to twinShowData', () => {
+    const twinShowData = [];
+    const wrapper = shallowMount(RegistrationForm, {
+      provide: {
+        twinShowData
+      }
+    });
+
+    wrapper.setData({
+      formData: {
+        nickname: 'John',
+        fullname: 'John Doe',
+        phone: '1234567890',
+        email: 'john.doe@example.com',
+        birthdate: '01-01-2000',
+        birthorder: '1',
+        coffee : '',
+        lovelanguage: ['Words of Affirmation', 'Acts of Service', 'Receiving Gifts'],
+        motto: 'Live and let live'
+      }
+    });
+
+    wrapper.vm.isError = false; // Set isError to false to allow submission
+    wrapper.vm.submitForm();
+
+    expect(twinShowData.length).toBe(1);
+    expect(twinShowData[0].btnTwin).toEqual(wrapper.vm.formData);
+    expect(wrapper.vm.isError).toBe(true); // Ensure isError is reset after submission
+  });
+});
