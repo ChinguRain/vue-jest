@@ -1,0 +1,55 @@
+import { shallowMount } from '@vue/test-utils';
+import CommonTextInput from '@/components/CommonTextInput.vue'; // Adjust the path as necessary
+
+describe('CommonTextInput.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    wrapper = shallowMount(CommonTextInput, {
+      propsData: {
+        item: {
+          readOnly: false,
+          type: 'text',
+          data: {
+            key: 'username',
+            saveAs: 'username'
+          },
+          label: {
+            value: 'Username',
+            placeholder: 'Enter your username'
+          }
+        }
+      }
+    });
+  });
+
+  it('renders correctly with props', () => {
+    expect(wrapper.props().item.data.key).toBe('username');
+    expect(wrapper.props().item.label.value).toBe('Username');
+  });
+
+  it('validates input correctly for text type', () => {
+    const event = { key: 'a', preventDefault: jest.fn() };
+    wrapper.vm.checkIfKeyIsValid(event, 'text', 'username');
+    expect(event.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('prevents invalid input for text type', () => {
+    const event = { key: '1', preventDefault: jest.fn() };
+    wrapper.vm.checkIfKeyIsValid(event, 'text', 'username');
+    expect(event.preventDefault).toHaveBeenCalled();
+  });
+
+  it('emits value correctly', () => {
+    wrapper.vm.textInputData = 'testUser ';
+    wrapper.vm.emitValue();
+    expect(wrapper.emitted().addValue).toBeTruthy();
+    expect(wrapper.emitted().addValue[0]).toEqual([{ key: 'username', value: 'testUser ' }]);
+  });
+
+  it('tests input with regex correctly', () => {
+    const regex = /^[a-zA-Z]+$/;
+    expect(wrapper.vm.testInput(regex, 'a')).toBe(true);
+    expect(wrapper.vm.testInput(regex, '1')).toBe(false);
+  });
+});
