@@ -1,0 +1,331 @@
+###SERALIZATION
+class Owner(db.Model):
+    # Existing fields...
+
+    def serialize(self):
+        return {
+            'owner_id': self.owner_id,
+            'owner_name': self.owner_name,
+            'owner_username': self.owner_username,
+            'owner_contact_number': self.owner_contact_number
+        }
+
+class Puppy(db.Model):
+    # Existing fields...
+
+    def serialize(self):
+        return {
+            'puppy_id': self.puppy_id,
+            'puppy_name': self.puppy_name,
+            'puppy_age': self.puppy_age,
+            'puppy_marking': self.puppy_marking,
+            'puppy_breed': self.puppy_breed,
+            'is_puppy_adopted': self.is_puppy_adopted,
+            'owner_id': self.owner_id
+        }
+
+
+###Owner Registration
+@app.route('/register_owner', methods=['POST'])
+def register_owner():
+    data = request.json
+    new_owner = Owner(
+        owner_name=data['owner_name'],
+        owner_username=data['owner_username'],
+        owner_password=hash_password(data['owner_password']),  # Ensure to hash the password
+        owner_contact_number=data['owner_contact_number']
+    )
+    db.session.add(new_owner)
+    db.session.commit()
+    return jsonify(new_owner.serialize()), 201
+
+
+###View Owner Info
+@app.route('/owner/<int:owner_id>', methods=['GET'])
+def view_owner(owner_id):
+    owner = Owner.query.get(owner_id)
+    if owner:
+        return jsonify(owner.serialize()), 200
+    return jsonify({'message': 'Owner not found'}), 404
+
+
+###See List of Puppies Owned by Owner
+@app.route('/owner/<int:owner_id>/puppies', methods=['GET'])
+def list_puppies_by_owner(owner_id):
+    puppies = Puppy.query.filter_by(owner_id=owner_id).all()
+    return jsonify([puppy.serialize() for puppy in puppies]), 200
+
+
+###Puppy Registration
+@app.route('/register_puppy', methods=['POST'])
+def register_puppy():
+    data = request.json
+    new_puppy = Puppy(
+        puppy_name=data['puppy_name'],
+        puppy_age=data['puppy_age'],
+        puppy_marking=data['puppy_marking'],
+        puppy_breed=data['puppy_breed'],
+        owner_id=data['owner_id']
+    )
+    db.session.add(new_puppy)
+    db.session.commit()
+    return jsonify(new_puppy.serialize()), 201
+
+
+###Puppy Edit Information
+@app.route('/puppy/<int:puppy_id>', methods=['PUT'])
+def edit_puppy(puppy_id):
+    data = request.json
+    puppy = Puppy.query.get(puppy_id)
+    if puppy:
+        puppy.puppy_name = data.get('puppy_name', puppy.puppy_name)
+        puppy.puppy_age = data.get('puppy_age', puppy.puppy_age)
+        puppy.puppy_marking = data.get('puppy_marking', puppy.puppy_marking)
+        puppy.puppy_breed = data.get('puppy_breed', puppy.puppy_breed)
+        db.session.commit()
+        return jsonify(puppy.serialize()), 200
+    return jsonify({'message': 'Puppy not found'}), 404
+
+
+###See Puppy List
+@app.route('/puppies', methods=['GET'])
+def list_puppies():
+    puppies = Puppy.query.filter_by(is_puppy_adopted=False).all()  # Assuming we want only available puppies
+    return jsonify([puppy.serialize() for puppy in puppies]), 200
+
+
+###Delete Puppy
+@app.route('/puppy/<int:puppy_id>', methods=['DELETE'])
+def delete_puppy(puppy_id):
+    puppy = Puppy.query.get(puppy_id)
+    if puppy:
+        db.session.delete(puppy)
+        db.session.commit()
+        return jsonify({'message': 'Puppy deleted'}), 200
+    return jsonify({'message': 'Puppy not found'}), 404
+
+
+
+###Input Validation in Route Handlers
+#1
+from flask import request, jsonify
+from marshmallow import Schema, fields, ValidationError
+
+# Define a schema for validation using Marshmallow
+class OwnerSchema(Schema):
+    owner_name = fields.Str(required=True)
+    owner_username = fields.Str(required=True)
+    owner_password = fields.Str(required=True, validate=lambda p: len(p) >= 6)
+    owner_contact_number = fields.Str(required=True)
+
+# Define a schema for puppy registration
+class PuppySchema(Schema):
+    puppy_name = fields.Str(required=True)
+    puppy_age = fields.Int(required=True, validate=lambda n: n > 0)
+    puppy_marking = fields.Str(required=True)
+    puppy_breed = fields.Str(required=True)
+    owner_id = fields.Int(required=True)
+
+@app.route('/register_owner', methods=['POST'])
+def register_owner():
+    schema = OwnerSchema()
+    try:
+        data = schema.load(request.json)  # Validate and deserialize input
+    except ValidationError as err:
+        return jsonify(err.messages), 400
+
+    new_owner = Owner(
+        owner_name=data['owner_name'],
+        owner_username=data['owner_username'],
+        owner_password=hash_password(data['owner_password']),
+        owner_contact_number=data['owner_contact_number']
+    )
+    db.session.add(new_owner)
+    db.session.commit()
+    return jsonify(new_owner.serialize()), 201
+
+
+###Input Validation in Route Handlers
+#2
+from sqlalchemy.ext.declarative import declared_attr
+
+class Owner(db.Model):
+    # Existing fields...
+
+    @validates('owner_username')
+    def validate_username(self, key, username):
+        if len(username) < 3:
+            raise ValueError("Username must be at least 3 characters long.")
+        return username
+
+    @validates('owner_password')
+    def validate_password(self, key, password):
+        if len(password) < 6:
+            raise ValueError("Password must be at least 6 characters long.")
+        return password
+
+
+###adopt puppy
+@app.route('/puppy/<int:puppy_id>/adopt', methods=['POST'])
+def adopt_puppy(puppy_id):
+    # Get the owner ID from the request body
+    data = request.json
+    owner_id = data.get('owner_id')
+
+    # Check if the owner exists
+    owner = Owner.query.get(owner_id)
+    if not owner:
+        return jsonify({'message': 'Owner not found'}), 404
+
+    # Check if the puppy exists
+    puppy = Puppy.query.get(puppy_id)
+    if not puppy:
+        return jsonify({'message': 'Puppy not found'}), 404
+
+    # Check if the puppy is already adopted
+    if puppy.is_puppy_adopted:
+        return jsonify({'message': 'Puppy is already adopted'}), 400
+
+    # Update the puppy's adoption status
+    puppy.is_puppy_adopted = True
+    puppy.owner_id = owner_id  # Optional: Associate the puppy with the new owner
+    db.session.commit()
+
+    return jsonify({'message': 'Puppy adopted successfully', 'puppy': puppy.serialize()}), 200
+
+
+    ###FRONTEND REGI
+    <template>
+  <div>
+    <h2>Register Owner</h2>
+    <form @submit.prevent="handleSubmit">
+      <input v-model="formData.owner_name" type="text" name="owner_name" placeholder="Owner Name" required />
+      <input v-model="formData.owner_username" type="text" name="owner_username" placeholder="Username" required />
+      <input v-model="formData.owner_password" type="password" name="owner_password" placeholder="Password" required />
+      <input v-model="formData.owner_contact_number" type="text" name="owner_contact_number" placeholder="Contact Number" required />
+      <button type="submit">Register</button>
+    </form>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      formData: {
+        owner_name: '',
+        owner_username: '',
+        owner_password: '',
+        owner_contact_number: ''
+      }
+    };
+  },
+  methods: {
+    async handleSubmit() {
+      const response = await fetch('/register_owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.formData)
+      });
+      const data = await response.json();
+      console.log(data); // Handle response accordingly
+    }
+  }
+};
+</script>
+
+<style scoped>
+/* Add your styles here */
+</style>
+
+
+###LIST PUPPIES
+<template>
+  <div>
+    <h2>Register Owner</h2>
+    <form @submit.prevent="handleSubmit">
+      <input v-model="formData.owner_name" type="text" name="owner_name" placeholder="Owner Name" required />
+      <input v-model="formData.owner_username" type="text" name="owner_username" placeholder="Username" required />
+      <input v-model="formData.owner_password" type="password" name="owner_password" placeholder="Password" required />
+      <input v-model="formData.owner_contact_number" type="text" name="owner_contact_number" placeholder="Contact Number" required />
+      <button type="submit">Register</button>
+    </form>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      formData: {
+        owner_name: '',
+        owner_username: '',
+        owner_password: '',
+        owner_contact_number: ''
+      }
+    };
+  },
+  methods: {
+    async handleSubmit() {
+      const response = await fetch('/register_owner', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(this.formData)
+      });
+      const data = await response.json();
+      console.log(data); // Handle response accordingly
+    }
+  }
+};
+</script>
+
+<style scoped>
+/* Add your styles here */
+</style>
+
+
+###ADOPT PUPPIES
+<!-- src/components/AdoptPuppy.vue -->
+<template>
+  <div>
+    <h2>Adopt Puppy</h2>
+    <p>Puppy ID: {{ puppy.id }}</p>
+    <p>Name: {{ puppy.name }}</p>
+    <p>Breed: {{ puppy.breed }}</p>
+
+    <form @submit.prevent="handleAdopt">
+      <input v-model="ownerId" type="text" placeholder="Owner ID" required />
+      <button type="submit">Adopt</button>
+    </form>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      puppy: {},
+      ownerId: ''
+    };
+  },
+  async created() {
+    const response = await fetch(`/puppy/${this.$route.params.puppyId}`);
+    this.puppy = await response.json();
+  },
+  methods: {
+    async handleAdopt() {
+      const response = await fetch(`/puppy/${this.puppy.id}/adopt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ owner_id: this.ownerId })
+      });
+      const data = await response.json();
+      console.log(data); // Handle response accordingly
+    }
+  }
+};
+</script>
+
+<style scoped>
+/* Add your styles here */
+</style>
